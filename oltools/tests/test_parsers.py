@@ -1,5 +1,10 @@
 from oltools.parsers import extract_json
+from oltools.parsers import stream_file
+from pathlib import Path
 import json
+
+
+TEST_FILE_PATH = Path(__file__).parent / "editions.txt.bz2"
 
 
 AUTHORS_TEXT = """
@@ -81,3 +86,13 @@ def test_author():
     for i, line in enumerate(AUTHORS_TEXT.strip().splitlines()):
         author = extract_json(line)
         assert json.loads(author) == AUTHORS[i]
+
+
+def test_stream_file():
+    # Open the file in raw mode (no decoding)
+
+    with open(TEST_FILE_PATH, "rb") as fh:
+        i = 0
+        for line in stream_file(fh, "bz2"):
+            i += 1
+        assert i == 1000

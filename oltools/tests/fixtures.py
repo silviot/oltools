@@ -11,6 +11,7 @@ def docker_compose_file(pytestconfig):
     return str(path)
 
 
+@pytest.mark.slow
 @pytest.fixture(scope="session")
 def psql_service(docker_ip, docker_services):
     """Ensure that the postgresql service is up and responsive."""
