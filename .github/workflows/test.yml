@@ -16,7 +16,7 @@ jobs:
     - name: Upgrade pip
       run: python -m pip install --upgrade pip
     - name: Install this package
-      run: python -m pip install -e .
+      run: python -m pip install -e .[test]
     - name: Lint with flake8
       run: |
         which flake8 || exit 0

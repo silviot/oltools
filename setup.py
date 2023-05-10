@@ -8,4 +8,8 @@ setup(name='oltools',
       author_email='silvio@tomatis.email',
       license='MIT',
       packages=['oltools'],
+      install_requires=[],
+      extras_require={
+          "test": ["pytest"],
+      },
       zip_safe=False)
