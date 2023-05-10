@@ -1,5 +1,6 @@
-import gzip
 import bz2
+import gzip
+import json
 
 
 def extract_json(textline):
@@ -27,3 +28,11 @@ def stream_file(fh, compression="gz"):
     for line in fh:
         # We decode the line and yield it.
         yield line.decode("utf-8")
+
+
+def stream_objects(lines):
+    """Takes lines in JSON fomat and a possible prefix.
+    It remves the prefix, decodes the JSON and yields the result.
+    """
+    for line in lines:
+        yield json.loads(extract_json(line))

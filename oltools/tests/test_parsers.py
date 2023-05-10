@@ -1,4 +1,5 @@
 from oltools.parsers import extract_json
+from oltools.parsers import stream_objects
 from oltools.parsers import stream_file
 from oltools.tests.utils import get_test_fh
 from oltools.tests.utils import AUTHORS
@@ -20,3 +21,12 @@ def test_stream_file():
         for line in stream_file(fh, "bz2"):
             i += 1
         assert i == 1000
+
+
+def test_stream_objects():
+    i = 0
+    with get_test_fh() as fh:
+        for book in stream_objects(stream_file(fh, "bz2")):
+            assert book["title"]
+            i += 1
+    assert i == 1000
