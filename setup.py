@@ -9,9 +9,14 @@ setup(
     author_email="silvio@tomatis.email",
     license="MIT",
     packages=["oltools"],
-    install_requires=["psycopg"],
+    install_requires=["psycopg", "rich-click"],
     extras_require={
         "test": ["pytest", "pytest-postgresql", "pytest-docker"],
+    },
+    entry_points={
+        "console_scripts": [
+            "ol-populate-pg = oltools.cli:populate_db",
+        ],
     },
     zip_safe=False,
 )

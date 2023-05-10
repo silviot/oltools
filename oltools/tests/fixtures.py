@@ -1,4 +1,5 @@
 from pathlib import Path
+from oltools.db import create_oldata_table
 import pytest
 import psycopg
 import sys
@@ -26,14 +27,7 @@ def psql_service(docker_ip, docker_services):
         timeout=30.0, pause=0.1, check=lambda: is_responsive(url)
     )
     print("\nDb started")
-    connection = psycopg.connect(url)
-    # Create table oldata
-    cursor = connection.cursor()
-    cursor.execute(
-        "CREATE TABLE oldata (type_id VARCHAR(100), id VARCHAR(100), data JSONB);"
-    )
-    connection.commit()
-    connection.close()
+    create_oldata_table(url)
     print("Table oldata created")
     yield url
     print("\nStopping db")
