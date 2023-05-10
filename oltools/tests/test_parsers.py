@@ -1,4 +1,5 @@
-from oltools.parsers import parse_author
+from oltools.parsers import extract_json
+import json
 
 
 AUTHORS_TEXT = """
@@ -78,5 +79,5 @@ AUTHORS = [
 
 def test_author():
     for i, line in enumerate(AUTHORS_TEXT.strip().splitlines()):
-        author = parse_author(line)
-        assert author == AUTHORS[i]
+        author = extract_json(line)
+        assert json.loads(author) == AUTHORS[i]

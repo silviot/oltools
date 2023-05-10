@@ -9,9 +9,9 @@ setup(
     author_email="silvio@tomatis.email",
     license="MIT",
     packages=["oltools"],
-    install_requires=[],
+    install_requires=["psycopg"],
     extras_require={
-        "test": ["pytest", "ruff"],
+        "test": ["pytest", "ruff", "pytest-postgresql", "pytest-docker"],
     },
     zip_safe=False,
 )
