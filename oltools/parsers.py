@@ -1,6 +1,5 @@
 import bz2
 import gzip
-import json
 
 
 def extract_json(textline):
@@ -40,4 +39,4 @@ def stream_objects(lines):
         index_second_tab = line.index("\t", index_first_tab + 1)
         type_ = line[:index_first_tab]
         id_ = line[index_first_tab + 1 : index_second_tab]
-        yield type_, id_, json.loads(extract_json(line))
+        yield type_, id_, extract_json(line)

@@ -26,7 +26,8 @@ def test_stream_file():
 def test_stream_objects():
     i = 0
     with get_test_fh() as fh:
-        for type_, id_, book in stream_objects(stream_file(fh, "bz2")):
+        for type_, id_, book_json in stream_objects(stream_file(fh, "bz2")):
+            book = json.loads(book_json)
             assert book["title"]
             i += 1
     assert i == 1000
