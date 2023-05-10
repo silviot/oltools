@@ -31,8 +31,13 @@ def stream_file(fh, compression="gz"):
 
 
 def stream_objects(lines):
-    """Takes lines in JSON fomat and a possible prefix.
-    It remves the prefix, decodes the JSON and yields the result.
+    """Takes lines in the format:
+    TYPE ID JSON
+    It decodes the JSON and yields the tuple (TYPE, ID, OBJ).
     """
     for line in lines:
-        yield json.loads(extract_json(line))
+        index_first_tab = line.index("\t")
+        index_second_tab = line.index("\t", index_first_tab + 1)
+        type_ = line[:index_first_tab]
+        id_ = line[index_first_tab + 1 : index_second_tab]
+        yield type_, id_, json.loads(extract_json(line))
