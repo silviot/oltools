@@ -11,7 +11,7 @@ setup(
     packages=["oltools"],
     install_requires=["psycopg"],
     extras_require={
-        "test": ["pytest", "ruff", "pytest-postgresql", "pytest-docker"],
+        "test": ["pytest", "pytest-postgresql", "pytest-docker"],
     },
     zip_safe=False,
 )
