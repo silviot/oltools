@@ -7,6 +7,7 @@ from rich.progress import (
     SpinnerColumn,
     TextColumn,
     TimeElapsedColumn,
+    TransferSpeedColumn,
 )
 
 
@@ -16,7 +17,10 @@ step_progress = Progress(
     TextColumn("  "),
     TimeElapsedColumn(),
     BarColumn(),
-    TextColumn("[bold purple]{task.completed} {task.description}"),
+    TextColumn(
+        "[bold purple]{task.completed} {task.description} {task.percentage:.0f}%"
+    ),
+    TransferSpeedColumn(),
     SpinnerColumn("simpleDots"),
 )
 
@@ -36,9 +40,11 @@ def populate_db(filename, postgres_url):
     def update_progress(advance):
         done["done"] += 1
         progress.update(
-            task1, advance=advance, description=f"Populating db with {done}"
+            db_entities,
+            advance=advance,
+            description=f"Populating db with {done['done']}",
         )
 
     with step_progress as progress:
-        task1 = progress.add_task("[red]Populating db", total=None)
+        db_entities = progress.add_task("[red]Populating db", total=None)
         insert_from_file(filename, postgres_url, update_progress)

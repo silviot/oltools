@@ -11,9 +11,11 @@ def get_connection(url):
     return psycopg.connect(url)
 
 
-def insert_from_file(
-    file_path, psql_service, update_progress=lambda advance=None: advance
-):
+def empty_update_progress(advance=None):
+    return advance
+
+
+def insert_from_file(file_path, psql_service, update_progress=empty_update_progress):
     filetype = None
     file_path = Path(file_path)
     if file_path.suffix == ".bz2":
