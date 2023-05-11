@@ -3,6 +3,7 @@ from pathlib import Path
 
 
 TEST_FILE_PATH = Path(__file__).parent / "editions.txt.bz2"
+TEST_FAULTY_FILE_PATH = Path(__file__).parent / "faulty_editions.txt.bz2"
 
 
 @contextmanager

@@ -2,11 +2,19 @@ from oltools.tests.fixtures import docker_compose_file, psql_service  # noqa
 from oltools.db import get_connection
 from oltools.db import insert_from_file
 from oltools.tests.utils import TEST_FILE_PATH
+from oltools.tests.utils import TEST_FAULTY_FILE_PATH
 import pytest
 
 
+insert_options = [
+    {"name": TEST_FILE_PATH, "count": 1000, "bytes": 147044},
+    {"name": TEST_FAULTY_FILE_PATH, "count": 50, "bytes": 10867},
+]
+
+
 @pytest.mark.slow
-def test_insert(psql_service):  # noqa F811
+@pytest.mark.parametrize("file", insert_options)
+def test_insert(psql_service, file):  # noqa F811
     connection = get_connection(psql_service)
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT(*) FROM oldata;")
@@ -19,17 +27,17 @@ def test_insert(psql_service):  # noqa F811
         totals[category] += advance
 
     insert_from_file(
-        TEST_FILE_PATH,
+        file["name"],
         psql_service,
         file_wrapper=wrapper,
         chunk_size=13,
         update_progress=update_progress,
     )
-    assert totals["global"] == 1000
-    assert wrapper.total_bytes == 147044
-    assert wrapper.processed_bytes == 147044
+    assert totals["global"] == file["count"]
+    assert wrapper.total_bytes == file["bytes"]
+    assert wrapper.processed_bytes == file["bytes"]
     cursor.execute("SELECT COUNT(*) FROM oldata;")
-    assert cursor.fetchone()[0] == original_count + 1000
+    assert cursor.fetchone()[0] == original_count + file["count"]
     connection.close()
 
 

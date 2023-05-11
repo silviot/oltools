@@ -54,16 +54,19 @@ def insert_from_file(
         for chunk_lines in iterator_of_iterators(
             stream_objects(stream_file(fh, filetype)), chunk_size
         ):
-            olobjects_string_iterator = StringIteratorIO(
-                (get_line(line) for line in chunk_lines)
-            )
-            cursor.copy_from(
-                olobjects_string_iterator,
-                "oldata",
-                sep="|",
-                null=r"\N",
-                columns=("type_id", "id", "data"),
-            )
+            lines = []
+            for line in chunk_lines:
+                lines.append(get_line(line))
+            try:
+                cursor.copy_from(
+                    io.StringIO("".join(lines)),
+                    "oldata",
+                    sep="|",
+                    null=r"\N",
+                    columns=("type_id", "id", "data"),
+                )
+            except psycopg2.errors.QueryCanceled:
+                raise
             connection.commit()
             update_progress(category="global", advance=cursor.rowcount)
     connection.commit()
@@ -127,6 +130,7 @@ class StringIteratorIO(io.TextIOBase):
     def __init__(self, iter):
         self._iter = iter
         self._buff = ""
+        self.results = []
 
     def readable(self) -> bool:
         return True
@@ -156,4 +160,6 @@ class StringIteratorIO(io.TextIOBase):
                     break
                 n -= len(m)
                 line.append(m)
-        return "".join(line)
+        result = "".join(line)
+        self.results.append(result)
+        return result

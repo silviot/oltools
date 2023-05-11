@@ -1,3 +1,4 @@
+from oltools.cli_utils import console
 import bz2
 import gzip
 
@@ -35,8 +36,12 @@ def stream_objects(lines):
     It decodes the JSON and yields the tuple (TYPE, ID, OBJ).
     """
     for line in lines:
-        index_first_tab = line.index("\t")
-        index_second_tab = line.index("\t", index_first_tab + 1)
-        type_ = line[:index_first_tab]
-        id_ = line[index_first_tab + 1 : index_second_tab]
-        yield type_, id_, extract_json(line)
+        try:
+            index_first_tab = line.index("\t")
+            index_second_tab = line.index("\t", index_first_tab + 1)
+            type_ = line[:index_first_tab]
+            id_ = line[index_first_tab + 1 : index_second_tab]
+            yield type_, id_, extract_json(line)
+        except ValueError:
+            console.print("[red]Error parsing line[/red]:")
+            console.print(line)
