@@ -3,6 +3,7 @@ Functions to manage connection to the postgresql database.
 """
 from oltools.parsers import stream_file
 from oltools.parsers import stream_objects
+from oltools.cli_utils import console, decimal
 from pathlib import Path
 import io
 import psycopg2
@@ -32,12 +33,17 @@ def insert_from_file(
     connection = get_connection(psql_service)
     cursor = connection.cursor()
     with open(file_path, "rb") as fh:
+        file_size = file_path.stat().st_size
         if file_wrapper:
             fh = file_wrapper(
                 fh,
-                total=file_path.stat().st_size,
+                total=file_size,
                 description=f"Reading from {file_path.name}",
             )
+        console.print(
+            f"[blue]Start processing file {file_path.name} "
+            f"[/blue]([red]{decimal(file_size)}[/red])"
+        )
         for chunk_lines in iterator_of_iterators(
             stream_objects(stream_file(fh, filetype)), chunk_size
         ):
@@ -49,16 +55,20 @@ def insert_from_file(
                 "oldata",
                 sep="|",
                 null=r"\N",
-                size=8192,
                 columns=("type_id", "id", "data"),
             )
+            connection.commit()
             update_progress(category="global", advance=cursor.rowcount)
     connection.commit()
     connection.close()
 
 
 def get_line(line):
-    result = "|".join(map(clean_csv_value, line))
+    if len(line[0]) > 100:
+        console.print(f"[red]Type too long: {line[0]}")
+    if len(line[1]) > 100:
+        console.print(f"[red]Id too long: {line[1]}")
+    result = "|".join((line[0][:100], line[1][:100], clean_csv_value(line[2])))
     return result
 
 
@@ -97,8 +107,10 @@ def create_oldata_table(url):
     # Create table oldata
     cursor = connection.cursor()
     cursor.execute(
-        "CREATE TABLE IF NOT EXISTS oldata (type_id VARCHAR(100), id"
-        " VARCHAR(100), data JSONB);"
+        "CREATE TABLE IF NOT EXISTS oldata "
+        "(type_id VARCHAR(100), "
+        "id VARCHAR(100), "
+        "data JSONB);"
     )
     connection.commit()
     connection.close()

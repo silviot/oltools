@@ -1,4 +1,5 @@
 import rich_click as click
+from rich.console import Console
 from rich.progress import (
     BarColumn,
     Progress,
@@ -11,6 +12,7 @@ from rich.progress import (
 
 
 click.rich_click.USE_RICH_MARKUP = True
+console = Console()
 
 
 class ThingsSpeedColumn(ProgressColumn):
@@ -48,6 +50,7 @@ step_progress = Progress(
     ),
     ThingsSpeedColumn(),
     SpinnerColumn("simpleDots"),
+    console=console,
 )
 
 

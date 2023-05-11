@@ -10,7 +10,11 @@ from oltools.cli_utils import step_progress
     "postgres-URL",
     default="postgresql://openlibrary:openlibrary@localhost:5432/openlibrary",
 )
-def populate_db(filename, postgres_url):
+@click.option(
+    "--chunk-size",
+    default=7000,
+)
+def populate_db(filename, postgres_url, chunk_size):
     create_oldata_table(postgres_url)
     totals = {"global": 0}
     tasks = {}
@@ -35,5 +39,9 @@ def populate_db(filename, postgres_url):
             "[red]Populating db", total=None, thing_name="entities"
         )
         insert_from_file(
-            filename, postgres_url, update_progress, file_wrapper=progress.wrap_file
+            filename,
+            postgres_url,
+            update_progress,
+            file_wrapper=progress.wrap_file,
+            chunk_size=chunk_size,
         )
