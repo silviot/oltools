@@ -12,7 +12,20 @@ def test_insert(psql_service):  # noqa F811
     cursor.execute("SELECT COUNT(*) FROM oldata;")
     original_count = cursor.fetchone()[0]
     wrapper = SimpleWrapper()
-    insert_from_file(TEST_FILE_PATH, psql_service, file_wrapper=wrapper, chunk_size=10)
+    totals = {}
+
+    def update_progress(category, advance):
+        totals.setdefault(category, 0)
+        totals[category] += advance
+
+    insert_from_file(
+        TEST_FILE_PATH,
+        psql_service,
+        file_wrapper=wrapper,
+        chunk_size=13,
+        update_progress=update_progress,
+    )
+    assert totals["global"] == 1000
     assert wrapper.total_bytes == 147044
     assert wrapper.processed_bytes == 147044
     cursor.execute("SELECT COUNT(*) FROM oldata;")

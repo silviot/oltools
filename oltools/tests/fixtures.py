@@ -1,7 +1,7 @@
 from pathlib import Path
 from oltools.db import create_oldata_table
 import pytest
-import psycopg
+import psycopg2
 import sys
 
 
@@ -35,8 +35,8 @@ def psql_service(docker_ip, docker_services):
 
 def is_responsive(url):
     try:
-        psycopg.connect(url)
+        psycopg2.connect(url)
         return True
-    except psycopg.OperationalError:
+    except psycopg2.OperationalError:
         sys.stdout.write(".")
         return False

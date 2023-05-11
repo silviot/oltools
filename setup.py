@@ -9,7 +9,7 @@ setup(
     author_email="silvio@tomatis.email",
     license="MIT",
     packages=["oltools"],
-    install_requires=["psycopg", "rich-click"],
+    install_requires=["psycopg2", "rich-click"],
     extras_require={
         "test": ["pytest", "pytest-postgresql", "pytest-docker"],
     },

@@ -5,11 +5,11 @@ from oltools.parsers import stream_file
 from oltools.parsers import stream_objects
 from pathlib import Path
 import io
-import psycopg
+import psycopg2
 
 
 def get_connection(url):
-    return psycopg.connect(url)
+    return psycopg2.connect(url)
 
 
 def empty_update_progress(**_):
@@ -41,14 +41,31 @@ def insert_from_file(
         for chunk_lines in iterator_of_iterators(
             stream_objects(stream_file(fh, filetype)), chunk_size
         ):
-            for type_, id_, obj in chunk_lines:
-                cursor.execute(
-                    "INSERT INTO oldata (type_id, id, data) VALUES (%s, %s, %s);",
-                    (type_, id_, obj),
-                )
-                update_progress(category=type_.split("/")[-1], advance=1)
+            olobjects_string_iterator = StringIteratorIO(
+                (get_line(line) for line in chunk_lines)
+            )
+            cursor.copy_from(
+                olobjects_string_iterator,
+                "oldata",
+                sep="|",
+                null=r"\N",
+                size=8192,
+                columns=("type_id", "id", "data"),
+            )
+            update_progress(category="global", advance=cursor.rowcount)
     connection.commit()
     connection.close()
+
+
+def get_line(line):
+    result = "|".join(map(clean_csv_value, line))
+    return result
+
+
+def clean_csv_value(value):
+    if value is None:
+        return r"\N"
+    return str(value).replace("\\", "\\\\").replace("|", r"\|")
 
 
 def iterator_of_iterators(baseiter, chunksize):
@@ -76,7 +93,7 @@ def iterator_of_iterators(baseiter, chunksize):
 
 
 def create_oldata_table(url):
-    connection = psycopg.connect(url)
+    connection = get_connection(url)
     # Create table oldata
     cursor = connection.cursor()
     cursor.execute(
