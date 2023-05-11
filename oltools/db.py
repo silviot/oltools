@@ -23,6 +23,7 @@ def insert_from_file(
     update_progress=empty_update_progress,
     file_wrapper=None,
     chunk_size=100,
+    offset=0,
 ):
     filetype = None
     file_path = Path(file_path)
@@ -34,6 +35,12 @@ def insert_from_file(
     cursor = connection.cursor()
     with open(file_path, "rb") as fh:
         file_size = file_path.stat().st_size
+        if offset:
+            fh.seek(offset)
+            file_size -= offset
+        # XXX TODO It would be better to start from offset, instead of
+        # pretending the file was smaller. The current API of wrap_file
+        # doesn't allow to specify a starting figure.
         if file_wrapper:
             fh = file_wrapper(
                 fh,

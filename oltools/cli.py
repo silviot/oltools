@@ -14,7 +14,11 @@ from oltools.cli_utils import step_progress
     "--chunk-size",
     default=7000,
 )
-def populate_db(filename, postgres_url, chunk_size):
+@click.option(
+    "--offset",
+    default=0,
+)
+def populate_db(filename, postgres_url, chunk_size, offset):
     create_oldata_table(postgres_url)
     totals = {"global": 0}
     tasks = {}
@@ -44,4 +48,5 @@ def populate_db(filename, postgres_url, chunk_size):
             update_progress,
             file_wrapper=progress.wrap_file,
             chunk_size=chunk_size,
+            offset=offset,
         )
