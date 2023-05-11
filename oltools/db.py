@@ -67,7 +67,7 @@ def insert_from_file(
                     columns=("type_id", "id", "data"),
                 )
                 howmany = cursor.rowcount
-            except psycopg2.errors.InvalidTextRepresentation as error:
+            except psycopg2.errors.Error as error:
                 connection.rollback()
                 try:
                     error_line_number = int(
@@ -100,7 +100,7 @@ def insert_from_file(
                             columns=("type_id", "id", "data"),
                         )
                         howmany += cursor.rowcount
-                    except psycopg2.errors.InvalidTextRepresentation as error:
+                    except psycopg2.errors.Error as error:
                         connection.rollback()
                         console.print(f"[red]Error in line[/red] [blue]{line}[/blue]")
             connection.commit()
