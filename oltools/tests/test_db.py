@@ -11,7 +11,26 @@ def test_insert(psql_service):  # noqa F811
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT(*) FROM oldata;")
     original_count = cursor.fetchone()[0]
-    insert_from_file(TEST_FILE_PATH, psql_service)
+    wrapper = SimpleWrapper()
+    insert_from_file(TEST_FILE_PATH, psql_service, file_wrapper=wrapper)
+    assert wrapper.total_bytes == 147044
+    assert wrapper.processed_bytes == 147044
     cursor.execute("SELECT COUNT(*) FROM oldata;")
     assert cursor.fetchone()[0] == original_count + 1000
     connection.close()
+
+
+class SimpleWrapper:
+    """Simple wrapper to test the wrapper parameter of inser_from_file"""
+
+    def __call__(self, fh, total, description=""):
+        assert not hasattr(self, "fh")
+        self.total_bytes = total
+        self.fh = fh
+        self.processed_bytes = 0
+        return self
+
+    def read(self, *args, **kwargs):
+        data = self.fh.read(*args, **kwargs)
+        self.processed_bytes += len(data)
+        return data

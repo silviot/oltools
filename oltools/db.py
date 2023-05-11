@@ -15,7 +15,9 @@ def empty_update_progress(advance=None):
     return advance
 
 
-def insert_from_file(file_path, psql_service, update_progress=empty_update_progress):
+def insert_from_file(
+    file_path, psql_service, update_progress=empty_update_progress, file_wrapper=None
+):
     filetype = None
     file_path = Path(file_path)
     if file_path.suffix == ".bz2":
@@ -25,6 +27,12 @@ def insert_from_file(file_path, psql_service, update_progress=empty_update_progr
     connection = get_connection(psql_service)
     cursor = connection.cursor()
     with open(file_path, "rb") as fh:
+        if file_wrapper:
+            fh = file_wrapper(
+                fh,
+                total=file_path.stat().st_size,
+                description=f"Reading from {file_path.name}",
+            )
         for type_, id_, obj in stream_objects(stream_file(fh, filetype)):
             update_progress(advance=1)
             cursor.execute(

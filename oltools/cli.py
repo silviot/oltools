@@ -47,4 +47,6 @@ def populate_db(filename, postgres_url):
 
     with step_progress as progress:
         db_entities = progress.add_task("[red]Populating db", total=None)
-        insert_from_file(filename, postgres_url, update_progress)
+        insert_from_file(
+            filename, postgres_url, update_progress, file_wrapper=progress.wrap_file
+        )
