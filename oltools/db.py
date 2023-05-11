@@ -1,6 +1,7 @@
 """
 Functions to manage connection to the postgresql database.
 """
+import re
 from oltools.parsers import stream_file
 from oltools.parsers import stream_objects
 from oltools.cli_utils import console, decimal
@@ -65,10 +66,45 @@ def insert_from_file(
                     null=r"\N",
                     columns=("type_id", "id", "data"),
                 )
-            except psycopg2.errors.QueryCanceled:
-                raise
+                howmany = cursor.rowcount
+            except psycopg2.errors.InvalidTextRepresentation as error:
+                connection.rollback()
+                try:
+                    error_line_number = int(
+                        re.search(
+                            "COPY oldata, line ([0-9]+),", error.pgerror
+                        ).groups()[0]
+                    )
+                    console.print(
+                        "[red]Error in line[/red] [blue]"
+                        + str(error_line_number)
+                        + f"[/blue]: {error.pgerror}"
+                    )
+                    console.print(lines[error_line_number - 1])
+                except (IndexError, AttributeError):
+                    console.print(error.pgerror)
+                # Done with error reporting. Now let's try again,
+                # this time in a less efficient fashion, one line at a time.
+                # We could exclude the faulty line, but who knows if there was
+                # another one after it.
+                howmany = 0
+                for i, line in enumerate(lines):
+                    if i == error_line_number - 1:
+                        continue
+                    try:
+                        cursor.copy_from(
+                            io.StringIO(line),
+                            "oldata",
+                            sep="|",
+                            null=r"\N",
+                            columns=("type_id", "id", "data"),
+                        )
+                        howmany += cursor.rowcount
+                    except psycopg2.errors.InvalidTextRepresentation as error:
+                        connection.rollback()
+                        console.print(f"[red]Error in line[/red] [blue]{line}[/blue]")
             connection.commit()
-            update_progress(category="global", advance=cursor.rowcount)
+            update_progress(category="generic", advance=howmany)
     connection.commit()
     connection.close()
 
