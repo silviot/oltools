@@ -7,9 +7,11 @@ import pytest
 
 @pytest.mark.slow
 def test_insert(psql_service):  # noqa F811
-    insert_from_file(TEST_FILE_PATH, psql_service)
     connection = get_connection(psql_service)
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT(*) FROM oldata;")
-    assert cursor.fetchone()[0] == 1000
+    original_count = cursor.fetchone()[0]
+    insert_from_file(TEST_FILE_PATH, psql_service)
+    cursor.execute("SELECT COUNT(*) FROM oldata;")
+    assert cursor.fetchone()[0] == original_count + 1000
     connection.close()
