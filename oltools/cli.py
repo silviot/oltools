@@ -23,20 +23,21 @@ def populate_db(filename, postgres_url, chunk_size, offset):
     totals = {"global": 0}
     tasks = {}
 
-    def update_progress(category, advance):
-        totals["global"] += 1
-        if category not in tasks:
-            totals[category] = 0
-            tasks[category] = progress.add_task(f"[green]{category}", total=None)
-        totals[category] += 1
-        progress.update(
-            tasks[category],
-            advance=advance,
-        )
-        progress.update(
-            tasks["global"],
-            advance=advance,
-        )
+    def update_progress(updates):
+        for category, advance in updates.items():
+            totals["global"] += 1
+            if category not in tasks:
+                totals[category] = 0
+                tasks[category] = progress.add_task(f"[green]{category}", total=None)
+            totals[category] += 1
+            progress.update(
+                tasks[category],
+                advance=advance,
+            )
+            progress.update(
+                tasks["global"],
+                advance=advance,
+            )
 
     with step_progress as progress:
         tasks["global"] = progress.add_task(

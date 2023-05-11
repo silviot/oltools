@@ -23,10 +23,11 @@ def test_insert(psql_service, file):  # noqa F811
     wrapper = SimpleWrapper()
     totals = {"global": 0}
 
-    def update_progress(category, advance):
-        totals.setdefault(category, 0)
-        totals[category] += advance
-        totals["global"] += advance
+    def update_progress(updates):
+        for category, advance in updates.items():
+            totals.setdefault(category, 0)
+            totals[category] += advance
+            totals["global"] += advance
 
     insert_from_file(
         file["name"],

@@ -1,6 +1,7 @@
 """
 Functions to manage connection to the postgresql database.
 """
+from collections import Counter
 import re
 from oltools.parsers import stream_file
 from oltools.parsers import stream_objects
@@ -56,7 +57,9 @@ def insert_from_file(
             stream_objects(stream_file(fh, filetype)), chunk_size
         ):
             lines = []
+            original_lines = []
             for line in chunk_lines:
+                original_lines.append(line)
                 lines.append(get_line(line))
             try:
                 cursor.copy_from(
@@ -66,7 +69,7 @@ def insert_from_file(
                     null=r"\N",
                     columns=("type_id", "id", "data"),
                 )
-                howmany = cursor.rowcount
+                progress_update = Counter(line[0] for line in original_lines)
             except psycopg2.errors.Error as error:
                 connection.rollback()
                 # First some error reporting
@@ -88,7 +91,7 @@ def insert_from_file(
                 # this time in a less efficient fashion, one line at a time.
                 # We could exclude the faulty line, but who knows if there was
                 # another one after it.
-                howmany = 0
+                progress_update = {}
                 for i, line in enumerate(lines):
                     if i == error_line_number - 1:
                         continue
@@ -100,12 +103,12 @@ def insert_from_file(
                             null=r"\N",
                             columns=("type_id", "id", "data"),
                         )
-                        update_progress(category="generic", advance=cursor.rowcount)
+                        update_progress({original_lines[i][0]: cursor.rowcount})
                     except psycopg2.errors.Error as error:
                         connection.rollback()
                         console.print(f"[red]Error in line[/red] [blue]{line}[/blue]")
             connection.commit()
-            update_progress(category="generic", advance=howmany)
+            update_progress(progress_update)
     connection.commit()
     connection.close()
 
