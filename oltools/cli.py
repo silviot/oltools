@@ -17,10 +17,9 @@ def populate_db(filename, postgres_url):
 
     def update_progress(category, advance):
         totals["global"] += 1
-        category_name = category.split("/")[-1]
         if category not in tasks:
             totals[category] = 0
-            tasks[category] = progress.add_task(f"[green]{category_name}", total=None)
+            tasks[category] = progress.add_task(f"[green]{category}", total=None)
         totals[category] += 1
         progress.update(
             tasks[category],

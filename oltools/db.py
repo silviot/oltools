@@ -17,7 +17,11 @@ def empty_update_progress(**_):
 
 
 def insert_from_file(
-    file_path, psql_service, update_progress=empty_update_progress, file_wrapper=None
+    file_path,
+    psql_service,
+    update_progress=empty_update_progress,
+    file_wrapper=None,
+    chunk_size=100,
 ):
     filetype = None
     file_path = Path(file_path)
@@ -34,14 +38,41 @@ def insert_from_file(
                 total=file_path.stat().st_size,
                 description=f"Reading from {file_path.name}",
             )
-        for type_, id_, obj in stream_objects(stream_file(fh, filetype)):
-            update_progress(category=type_, advance=1)
-            cursor.execute(
-                "INSERT INTO oldata (type_id, id, data) VALUES (%s, %s, %s);",
-                (type_, id_, obj),
-            )
+        for chunk_lines in iterator_of_iterators(
+            stream_objects(stream_file(fh, filetype)), chunk_size
+        ):
+            for type_, id_, obj in chunk_lines:
+                cursor.execute(
+                    "INSERT INTO oldata (type_id, id, data) VALUES (%s, %s, %s);",
+                    (type_, id_, obj),
+                )
+                update_progress(category=type_.split("/")[-1], advance=1)
     connection.commit()
     connection.close()
+
+
+def iterator_of_iterators(baseiter, chunksize):
+    """Yield successive chunks from baseiter."""
+    emitted_info = {}
+    emitted_info["total"] = 0
+    emitted_info["finished"] = False
+    iterator = iter(baseiter)
+
+    def to_return():
+        current = None
+        try:
+            while True:
+                current = next(iterator)
+                emitted_info["total"] += 1
+                yield current
+                if emitted_info["total"] == chunksize:
+                    emitted_info["total"] = 0
+                    break
+        except StopIteration:
+            emitted_info["finished"] = True
+
+    while not emitted_info["finished"]:
+        yield to_return()
 
 
 def create_oldata_table(url):
