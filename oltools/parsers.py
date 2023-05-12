@@ -32,8 +32,8 @@ def stream_file(fh, compression="gz"):
 
 def stream_objects(lines):
     """Takes lines in the format:
-    TYPE ID JSON
-    It decodes the JSON and yields the tuple (TYPE, ID, OBJ).
+    TYPE ID <OTHER THINGS THAT WILL BE IGNORED> JSON
+    It isolates the JSON and yields the tuple (TYPE, ID, OBJ).
     """
     for line in lines:
         try:
