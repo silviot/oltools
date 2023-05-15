@@ -26,14 +26,16 @@ def populate_db(filename, database_url, chunk_size, offset):
     def update_progress(updates):
         for category, advance in updates.items():
             totals["global"] += 1
-            if category not in tasks:
+            if category not in totals:
                 totals[category] = 0
-                tasks[category] = progress.add_task(f"[green]{category}", total=None)
             totals[category] += 1
-            progress.update(
-                tasks[category],
-                advance=advance,
-            )
+            if category not in tasks and totals[category] > 10:
+                tasks[category] = progress.add_task(f"[green]{category}", total=None)
+            if category in tasks:
+                progress.update(
+                    tasks[category],
+                    advance=advance,
+                )
             progress.update(
                 tasks["global"],
                 advance=advance,
