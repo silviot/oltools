@@ -7,8 +7,8 @@ from oltools.cli_utils import step_progress
 @click.command()
 @click.argument("filename")
 @click.argument(
-    "postgres-URL",
-    default="postgresql://openlibrary:openlibrary@localhost:5432/openlibrary",
+    "database-URL",
+    default="sqlite:////tmp/oldata.db",
 )
 @click.option(
     "--chunk-size",
@@ -18,8 +18,8 @@ from oltools.cli_utils import step_progress
     "--offset",
     default=0,
 )
-def populate_db(filename, postgres_url, chunk_size, offset):
-    create_oldata_table(postgres_url)
+def populate_db(filename, database_url, chunk_size, offset):
+    create_oldata_table(database_url)
     totals = {"global": 0}
     tasks = {}
 
@@ -45,7 +45,7 @@ def populate_db(filename, postgres_url, chunk_size, offset):
         )
         insert_from_file(
             filename,
-            postgres_url,
+            database_url,
             update_progress,
             file_wrapper=progress.wrap_file,
             chunk_size=chunk_size,

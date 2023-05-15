@@ -9,10 +9,14 @@ from oltools.cli_utils import console, decimal
 from pathlib import Path
 import io
 import psycopg2
+import sqlite3
 
 
 def get_connection(url):
-    return psycopg2.connect(url)
+    if url.startswith("postgresql://"):
+        return psycopg2.connect(url)
+    elif url.startswith("sqlite://"):
+        return sqlite3.connect(url.replace("sqlite://", ""), isolation_level="DEFERRED")
 
 
 def empty_update_progress(**_):
@@ -21,7 +25,7 @@ def empty_update_progress(**_):
 
 def insert_from_file(
     file_path,
-    psql_service,
+    url,
     update_progress=empty_update_progress,
     file_wrapper=None,
     chunk_size=100,
@@ -33,7 +37,7 @@ def insert_from_file(
         filetype = "bz2"
     elif file_path.suffix == ".gz":
         filetype = "gz"
-    connection = get_connection(psql_service)
+    connection = get_connection(url)
     cursor = connection.cursor()
     with open(file_path, "rb") as fh:
         file_size = file_path.stat().st_size
@@ -53,64 +57,82 @@ def insert_from_file(
             f"[blue]Start processing file {file_path.name} "
             f"[/blue]([red]{decimal(file_size)}[/red])"
         )
+        if url.startswith("postgresql://"):
+            insert_chunk = insert_chunk_postgresql
+        elif url.startswith("sqlite://"):
+            insert_chunk = insert_chunk_sqlite
         for chunk_lines in iterator_of_iterators(
             stream_objects(stream_file(fh, filetype)), chunk_size
         ):
-            lines = []
-            original_lines = []
-            for line in chunk_lines:
-                original_lines.append(line)
-                lines.append(get_line(line))
+            insert_chunk(cursor, chunk_lines, connection, update_progress)
+    connection.commit()
+    connection.close()
+
+
+def insert_chunk_sqlite(cursor, chunk_lines, connection, update_progress):
+    to_insert = list(chunk_lines)
+    cursor.execute("PRAGMA synchronous = OFF")
+    cursor.execute("PRAGMA journal_mode = OFF")
+
+    cursor.executemany(
+        "INSERT INTO oldata (type_id, id, data) VALUES (?, ?, ?)", to_insert
+    )
+    cursor.connection.commit()
+    update_progress(Counter(line[0] for line in to_insert))
+
+
+def insert_chunk_postgresql(cursor, chunk_lines, connection, update_progress):
+    lines = []
+    original_lines = []
+    for line in chunk_lines:
+        original_lines.append(line)
+        lines.append(get_line(line))
+    try:
+        cursor.copy_from(
+            io.StringIO("".join(lines)),
+            "oldata",
+            sep="|",
+            null=r"\N",
+            columns=("type_id", "id", "data"),
+        )
+        progress_update = Counter(line[0] for line in original_lines)
+    except psycopg2.errors.Error as error:
+        connection.rollback()
+        # First some error reporting
+        try:
+            error_line_number = int(
+                re.search("COPY oldata, line ([0-9]+),", error.pgerror).groups()[0]
+            )
+            console.print(
+                "[red]Error in line[/red] [blue]"
+                + str(error_line_number)
+                + f"[/blue]: {error.pgerror}"
+            )
+            console.print(lines[error_line_number - 1])
+        except (IndexError, AttributeError):
+            console.print(error.pgerror)
+        # Done with error reporting. Now let's try again,
+        # this time in a less efficient fashion, one line at a time.
+        # We could exclude the faulty line, but who knows if there was
+        # another one after it.
+        progress_update = {}
+        for i, line in enumerate(lines):
+            if i == error_line_number - 1:
+                continue
             try:
                 cursor.copy_from(
-                    io.StringIO("".join(lines)),
+                    io.StringIO(line),
                     "oldata",
                     sep="|",
                     null=r"\N",
                     columns=("type_id", "id", "data"),
                 )
-                progress_update = Counter(line[0] for line in original_lines)
+                update_progress({original_lines[i][0]: cursor.rowcount})
             except psycopg2.errors.Error as error:
                 connection.rollback()
-                # First some error reporting
-                try:
-                    error_line_number = int(
-                        re.search(
-                            "COPY oldata, line ([0-9]+),", error.pgerror
-                        ).groups()[0]
-                    )
-                    console.print(
-                        "[red]Error in line[/red] [blue]"
-                        + str(error_line_number)
-                        + f"[/blue]: {error.pgerror}"
-                    )
-                    console.print(lines[error_line_number - 1])
-                except (IndexError, AttributeError):
-                    console.print(error.pgerror)
-                # Done with error reporting. Now let's try again,
-                # this time in a less efficient fashion, one line at a time.
-                # We could exclude the faulty line, but who knows if there was
-                # another one after it.
-                progress_update = {}
-                for i, line in enumerate(lines):
-                    if i == error_line_number - 1:
-                        continue
-                    try:
-                        cursor.copy_from(
-                            io.StringIO(line),
-                            "oldata",
-                            sep="|",
-                            null=r"\N",
-                            columns=("type_id", "id", "data"),
-                        )
-                        update_progress({original_lines[i][0]: cursor.rowcount})
-                    except psycopg2.errors.Error as error:
-                        connection.rollback()
-                        console.print(f"[red]Error in line[/red] [blue]{line}[/blue]")
-            connection.commit()
-            update_progress(progress_update)
+                console.print(f"[red]Error in line[/red] [blue]{line}[/blue]")
     connection.commit()
-    connection.close()
+    update_progress(progress_update)
 
 
 def get_line(line):
