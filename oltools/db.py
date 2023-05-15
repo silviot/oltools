@@ -75,7 +75,10 @@ def insert_chunk_sqlite(cursor, chunk_lines, connection, update_progress):
     cursor.execute("PRAGMA journal_mode = OFF")
 
     cursor.executemany(
-        "INSERT INTO oldata (type_id, id, data) VALUES (?, ?, ?)", to_insert
+        "INSERT INTO oldata "
+        "(type, key, revision, last_modified, data)"
+        " VALUES (?, ?, ?, ?, ?)",
+        to_insert,
     )
     cursor.connection.commit()
     update_progress(Counter(line[0] for line in to_insert))
@@ -93,7 +96,7 @@ def insert_chunk_postgresql(cursor, chunk_lines, connection, update_progress):
             "oldata",
             sep="|",
             null=r"\N",
-            columns=("type_id", "id", "data"),
+            columns=("type", "key", "revision", "last_modified", "data"),
         )
         progress_update = Counter(line[0] for line in original_lines)
     except psycopg2.errors.Error as error:
@@ -125,7 +128,7 @@ def insert_chunk_postgresql(cursor, chunk_lines, connection, update_progress):
                     "oldata",
                     sep="|",
                     null=r"\N",
-                    columns=("type_id", "id", "data"),
+                    columns=("type", "key", "revision", "last_modified", "data"),
                 )
                 update_progress({original_lines[i][0]: cursor.rowcount})
             except psycopg2.errors.Error as error:
@@ -136,11 +139,13 @@ def insert_chunk_postgresql(cursor, chunk_lines, connection, update_progress):
 
 
 def get_line(line):
-    if len(line[0]) > 100:
+    if len(line[0]) > 20:
         console.print(f"[red]Type too long: {line[0]}")
-    if len(line[1]) > 100:
+    if len(line[1]) > 20:
         console.print(f"[red]Id too long: {line[1]}")
-    result = "|".join((line[0][:100], line[1][:100], clean_csv_value(line[2])))
+    result = "|".join(
+        (line[0][:20], line[1][:20], line[2], line[3], clean_csv_value(line[4]))
+    )
     return result
 
 
@@ -179,10 +184,13 @@ def create_oldata_table(url):
     # Create table oldata
     cursor = connection.cursor()
     cursor.execute(
-        "CREATE TABLE IF NOT EXISTS oldata "
-        "(type_id VARCHAR(100), "
-        "id VARCHAR(100), "
-        "data JSONB);"
+        "CREATE TABLE IF NOT EXISTS oldata ("
+        "type VARCHAR(100), "
+        "key VARCHAR(100), "
+        "revision INT, "
+        "last_modified TIMESTAMP, "
+        "data JSONB"
+        ");"
     )
     connection.commit()
     connection.close()

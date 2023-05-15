@@ -3,16 +3,6 @@ import bz2
 import gzip
 
 
-def extract_json(textline):
-    """We need to get the JSON content of this line.
-    We know the line has a prefix. We assume the character `{` does not appear
-    in the prefix.
-    """
-    # We first find the index of the first `{` character.
-    index = textline.find("{")
-    return textline[index:]
-
-
 def stream_file(fh, compression="gz"):
     """Receives a file handle of a file, possibly compressed with gzip (`gz`),
     bzip2 (`bz2`), or uncompressed (`None`).
@@ -37,11 +27,8 @@ def stream_objects(lines):
     """
     for line in lines:
         try:
-            index_first_tab = line.index("\t")
-            index_second_tab = line.index("\t", index_first_tab + 1)
-            type_ = line[:index_first_tab]
-            id_ = line[index_first_tab + 1 : index_second_tab]
-            yield type_, id_, extract_json(line)
+            type_, key, revision, last_modified, obj = line.split("\t", 4)
+            yield type_, key, revision, last_modified, obj
         except ValueError:
             console.print("[red]Error parsing line[/red]:")
             console.print(line)

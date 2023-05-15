@@ -14,7 +14,7 @@ import pytest
 
 insert_options = [
     {"name": TEST_FILE_PATH, "count": [1000], "bytes": 147044},
-    # FIXME count should be 50
+    # FIXME count should be 50, not 44 or 54
     {"name": TEST_FAULTY_FILE_PATH, "count": [44, 54], "bytes": 10789},
 ]
 
