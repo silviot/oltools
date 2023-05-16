@@ -10,6 +10,7 @@ from oltools.parsers import stream_objects
 from oltools.cli_utils import console, decimal
 from pathlib import Path
 from typing import Optional
+import atexit
 import io
 import psycopg2
 import sqlite3
@@ -72,14 +73,34 @@ def insert_from_file(
     connection.close()
 
 
+samples = {}
+COLLECT = 10
+
+
+def save_samples():
+    console.print("[blue]Exiting")
+    with open("/tmp/openlibrary_samples.txt", "w") as samples_file:
+        for sample in samples.values():
+            lines = ["\t".join(el) for el in sample]
+            samples_file.write("".join(lines))
+
+
+atexit.register(save_samples)
+
+
 def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
     to_insert = list(chunk_lines)
     # Divide the cunk_lines by type
     to_insert.sort(key=lambda line: line[0])
     cursor.execute("PRAGMA synchronous = OFF")
     cursor.execute("PRAGMA journal_mode = OFF")
-
     for key, group_with_type in groupby(to_insert, lambda x: x[0]):
+        group_with_type = tuple(group_with_type)
+        current_size = len(samples.get(key, []))
+        if current_size < COLLECT:
+            to_add = COLLECT - current_size
+            samples.setdefault(key, []).extend(group_with_type[:to_add])
+            save_samples()
         group = remove_first_items(group_with_type)
         cursor.executemany(
             f'INSERT INTO "{key}" '
@@ -275,6 +296,10 @@ class DataType(Enum):
     template = "template"
     content = "content"
     doc = "doc"
+    i18n_page = "i18n_page"
+    user = "user"
+    language = "language"
+    volume = "volume"
 
 
 VALID_TYPES = set(el.name for el in DataType)
