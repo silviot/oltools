@@ -2,17 +2,20 @@
 Functions to manage connection to the postgresql database.
 """
 from collections import Counter
+from enum import Enum
+from itertools import groupby
 import re
 from oltools.parsers import stream_file
 from oltools.parsers import stream_objects
 from oltools.cli_utils import console, decimal
 from pathlib import Path
+from typing import Optional
 import io
 import psycopg2
 import sqlite3
 
 
-def get_connection(url):
+def get_connection(url: str):
     if url.startswith("postgresql://"):
         return psycopg2.connect(url)
     elif url.startswith("sqlite://"):
@@ -64,43 +67,64 @@ def insert_from_file(
         for chunk_lines in iterator_of_iterators(
             stream_objects(stream_file(fh, filetype)), chunk_size
         ):
-            insert_chunk(cursor, chunk_lines, connection, update_progress)
+            insert_chunk(cursor, chunk_lines, update_progress)
     connection.commit()
     connection.close()
 
 
-def insert_chunk_sqlite(cursor, chunk_lines, connection, update_progress):
+def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
     to_insert = list(chunk_lines)
+    # Divide the cunk_lines by type
+    to_insert.sort(key=lambda line: line[0])
     cursor.execute("PRAGMA synchronous = OFF")
     cursor.execute("PRAGMA journal_mode = OFF")
 
-    cursor.executemany(
-        "INSERT INTO oldata "
-        "(type, key, revision, last_modified, data)"
-        " VALUES (?, ?, ?, ?, ?)",
-        to_insert,
-    )
+    for key, group_with_type in groupby(to_insert, lambda x: x[0]):
+        group = remove_first_items(group_with_type)
+        cursor.executemany(
+            f'INSERT INTO "{key}" '
+            "(key, revision, last_modified, data)"
+            " VALUES (?, ?, ?, ?)",
+            group,
+        )
     cursor.connection.commit()
     update_progress(Counter(line[0] for line in to_insert))
 
 
-def insert_chunk_postgresql(cursor, chunk_lines, connection, update_progress):
-    lines = []
-    original_lines = []
+def remove_first_items(iterable):
+    for collection in iterable:
+        yield collection[1:]
+
+
+def insert_chunk_postgresql(cursor, chunk_lines, update_progress):
+    lines = {}
+    original_lines = {}
     for line in chunk_lines:
-        original_lines.append(line)
-        lines.append(get_line(line))
+        if line[0] not in VALID_TYPES:
+            continue
+        original_lines.setdefault(line[0], []).append(line)
+        lines.setdefault(line[0], []).append(get_psql_line(line))
+
+    for type_, objs in lines.items():
+        insert_chunk_postgresql_table(
+            cursor, objs, original_lines[type_], update_progress, type_
+        )
+
+
+def insert_chunk_postgresql_table(
+    cursor, lines, original_lines, update_progress, table_name
+):
     try:
         cursor.copy_from(
             io.StringIO("".join(lines)),
-            "oldata",
+            table_name,
             sep="|",
             null=r"\N",
-            columns=("type", "key", "revision", "last_modified", "data"),
+            columns=("key", "revision", "last_modified", "data"),
         )
         progress_update = Counter(line[0] for line in original_lines)
     except psycopg2.errors.Error as error:
-        connection.rollback()
+        cursor.connection.rollback()
         # First some error reporting
         try:
             error_line_number = int(
@@ -125,31 +149,27 @@ def insert_chunk_postgresql(cursor, chunk_lines, connection, update_progress):
             try:
                 cursor.copy_from(
                     io.StringIO(line),
-                    "oldata",
+                    table_name,
                     sep="|",
                     null=r"\N",
-                    columns=("type", "key", "revision", "last_modified", "data"),
+                    columns=("key", "revision", "last_modified", "data"),
                 )
                 update_progress({original_lines[i][0]: cursor.rowcount})
             except psycopg2.errors.Error as error:
-                connection.rollback()
+                cursor.connection.rollback()
                 console.print(f"[red]Error in line[/red] [blue]{line}[/blue]")
-    connection.commit()
+    cursor.connection.commit()
     update_progress(progress_update)
 
 
-def get_line(line):
-    if len(line[0]) > 20:
-        console.print(f"[red]Type too long: {line[0]}")
+def get_psql_line(line):
     if len(line[1]) > 20:
         console.print(f"[red]Id too long: {line[1]}")
-    result = "|".join(
-        (line[0][:20], line[1][:20], line[2], line[3], clean_csv_value(line[4]))
-    )
+    result = "|".join((line[1][:20], line[2], line[3], clean_csv_value(line[4])))
     return result
 
 
-def clean_csv_value(value):
+def clean_csv_value(value: Optional[str]):
     if value is None:
         return r"\N"
     return str(value).replace("\\", "\\\\").replace("|", r"\|")
@@ -179,19 +199,18 @@ def iterator_of_iterators(baseiter, chunksize):
         yield to_return()
 
 
-def create_oldata_table(url):
+def create_oldata_tables(url):
     connection = get_connection(url)
-    # Create table oldata
     cursor = connection.cursor()
-    cursor.execute(
-        "CREATE TABLE IF NOT EXISTS oldata ("
-        "type VARCHAR(100), "
-        "key VARCHAR(100), "
-        "revision INT, "
-        "last_modified TIMESTAMP, "
-        "data JSONB"
-        ");"
-    )
+    for type_ in DataType:
+        cursor.execute(
+            f'CREATE TABLE IF NOT EXISTS "{type_.name}" ('
+            "key char(13), "  # I observed ids are always 10 characters long
+            "revision INT, "
+            "last_modified TIMESTAMP, "
+            "data JSONB"
+            ");"
+        )
     connection.commit()
     connection.close()
 
@@ -233,3 +252,29 @@ class StringIteratorIO(io.TextIOBase):
         result = "".join(line)
         self.results.append(result)
         return result
+
+
+class DataType(Enum):
+    """Different kind of records that can be found in the OL dump."""
+
+    edition = "edition"
+    work = "work"
+    author = "author"
+    delete = "delete"
+    page = "page"
+    redirect = "redirect"
+    i18n = "i18n"
+    property = "property"
+    type = "type"
+    collection = "collection"
+    backreference = "backreference"
+    permission = "permission"
+    usergroup = "usergroup"
+    macro = "macro"
+    about = "about"
+    template = "template"
+    content = "content"
+    doc = "doc"
+
+
+VALID_TYPES = set(el.name for el in DataType)

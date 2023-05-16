@@ -28,6 +28,9 @@ def test_stream_objects():
         for type_, key, revision, last_modified, book_json in stream_objects(
             stream_file(fh, "bz2")
         ):
+            assert type_.count("/") == 0, "There should be no slashes in the type"
+            assert key.count("/") == 0, "There should be no slashes in the key"
+            assert int(revision) > 0
             book = json.loads(book_json)
             assert book["title"]
             i += 1

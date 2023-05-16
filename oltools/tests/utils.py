@@ -2,13 +2,14 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
-TEST_FILE_PATH = Path(__file__).parent / "editions.txt.bz2"
+TEST_ALL_RECORDS_FILE_PATH = Path(__file__).parent / "records.txt.bz2"
+TEST_EDITIONS_FILE_PATH = Path(__file__).parent / "editions.txt.bz2"
 TEST_FAULTY_FILE_PATH = Path(__file__).parent / "faulty_editions.txt.bz2"
 
 
 @contextmanager
 def get_test_fh():
-    with open(TEST_FILE_PATH, "rb") as fh:
+    with open(TEST_EDITIONS_FILE_PATH, "rb") as fh:
         yield fh
 
 

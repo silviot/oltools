@@ -1,5 +1,5 @@
 from pathlib import Path
-from oltools.db import create_oldata_table
+from oltools.db import create_oldata_tables
 import psycopg2
 import pytest
 import os
@@ -28,7 +28,7 @@ def psql_service(docker_ip, docker_services):
         timeout=30.0, pause=0.1, check=lambda: is_responsive(url)
     )
     print("\nDb started")
-    create_oldata_table(url)
+    create_oldata_tables(url)
     print("Table oldata created")
     yield url
     print("\nStopping db")
@@ -41,7 +41,7 @@ def sqlite_tmpfile():
     os.close(fd)
     url = "sqlite:///" + path
     print(f"Using temporary sqlite file {path}")
-    create_oldata_table(url)
+    create_oldata_tables(url)
     yield url
     if Path(path).exists():
         Path(path).unlink()

@@ -1,6 +1,6 @@
 import rich_click as click
 from oltools.db import insert_from_file
-from oltools.db import create_oldata_table
+from oltools.db import create_oldata_tables
 from oltools.cli_utils import step_progress
 
 
@@ -19,7 +19,7 @@ from oltools.cli_utils import step_progress
     default=0,
 )
 def populate_db(filename, database_url, chunk_size, offset):
-    create_oldata_table(database_url)
+    create_oldata_tables(database_url)
     totals = {"global": 0}
     tasks = {}
 
