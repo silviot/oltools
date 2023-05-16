@@ -27,21 +27,12 @@ def stream_objects(lines):
     """
     from oltools.db import VALID_TYPES
 
-    already_printed = set()
-
     for line in lines:
         try:
             type_, key, revision, last_modified, obj = line.split("\t", 4)
             type_ = type_.split("/", 3)[2]
             if type_ not in VALID_TYPES:
                 console.print(f"Type [red]{type_}[/red] not found")
-                continue
-            try:
-                key = key.split("/", 3)[2]
-            except IndexError:
-                if key not in already_printed:
-                    console.print(f"Key [red]{key}[/red] not found")
-                    already_printed.add(key)
                 continue
             yield type_, key, revision, last_modified, obj
         except ValueError:

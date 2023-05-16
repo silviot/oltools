@@ -80,15 +80,30 @@ def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
     cursor.execute("PRAGMA journal_mode = OFF")
 
     for key, group_with_type in groupby(to_insert, lambda x: x[0]):
-        group = remove_first_items(group_with_type)
-        cursor.executemany(
-            f'INSERT INTO "{key}" '
-            "(key, revision, last_modified, data)"
-            " VALUES (?, ?, ?, ?)",
-            group,
-        )
+        group = tuple(remove_first_items(group_with_type))
+        try:
+            cursor.executemany(
+                f'INSERT INTO "{key}" '
+                "(key, revision, last_modified, data)"
+                " VALUES (?, ?, ?, ?)",
+                group,
+            )
+            update_progress(Counter(line[0] for line in to_insert))
+        except (sqlite3.OperationalError, sqlite3.IntegrityError):
+            for line in group:
+                try:
+                    cursor.execute(
+                        f'INSERT INTO "{key}" '
+                        "(key, revision, last_modified, data)"
+                        " VALUES (?, ?, ?, ?)",
+                        line,
+                    )
+                    update_progress({key: 1})
+                except (sqlite3.OperationalError, sqlite3.IntegrityError) as e:
+                    console.print(
+                        f"[red]Error: [blue]{e} [grey]{key} {line[0]} {line[1]}"
+                    )
     cursor.connection.commit()
-    update_progress(Counter(line[0] for line in to_insert))
 
 
 def remove_first_items(iterable):
@@ -205,10 +220,10 @@ def create_oldata_tables(url):
     for type_ in DataType:
         cursor.execute(
             f'CREATE TABLE IF NOT EXISTS "{type_.name}" ('
-            "key char(13), "  # I observed ids are always 10 characters long
+            "key char(20), "
             "revision INT, "
             "last_modified TIMESTAMP, "
-            "data JSONB"
+            "data JSONB "
             ");"
         )
     connection.commit()
@@ -275,6 +290,22 @@ class DataType(Enum):
     template = "template"
     content = "content"
     doc = "doc"
+    volume = "volume"
+    user = "user"
+    i18n_page = "i18n_page"
+    language = "language"
+    home = "home"
+    rawtext = "rawtext"
+    object = "object"
+    subject = "subject"
+    library = "library"
+    scan_record = "scan_record"
+    uri = "uri"
+    series = "series"
+    scan_location = "scan_location"
+    place = "place"
+    local_id = "local_id"
+    list = "list"
 
 
 VALID_TYPES = set(el.name for el in DataType)
