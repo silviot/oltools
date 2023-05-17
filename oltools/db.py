@@ -10,6 +10,7 @@ from oltools.parsers import stream_objects
 from oltools.cli_utils import console, decimal
 from pathlib import Path
 from typing import Optional
+import atexit
 import io
 import psycopg2
 import sqlite3
@@ -72,14 +73,33 @@ def insert_from_file(
     connection.close()
 
 
+samples = {}
+COLLECT = 10
+
+
+def save_samples(exiting: bool = False):
+    def doit():
+        if exiting:
+            console.print("[blue]Exiting")
+        with open("/tmp/openlibrary_samples.txt", "w") as samples_file:
+            for sample in samples.values():
+                lines = ["/type/" + "\t".join(el) for el in sample]
+                samples_file.write("".join(lines))
+
+    return doit
+
+
+atexit.register(save_samples(True))
+
+
 def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
     to_insert = list(chunk_lines)
     # Divide the cunk_lines by type
     to_insert.sort(key=lambda line: line[0])
     cursor.execute("PRAGMA synchronous = OFF")
     cursor.execute("PRAGMA journal_mode = OFF")
-
     for key, group_with_type in groupby(to_insert, lambda x: x[0]):
+        group_with_type = tuple(group_with_type)
         group = tuple(remove_first_items(group_with_type))
         try:
             cursor.executemany(
@@ -88,6 +108,12 @@ def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
                 " VALUES (?, ?, ?, ?)",
                 group,
             )
+            current_size = len(samples.get(key, []))
+            if current_size < COLLECT:
+                to_add = COLLECT - current_size
+                to_sample = [el for el in group_with_type[:to_add]]
+                samples.setdefault(key, []).extend(to_sample)
+                save_samples(False)()
             update_progress(Counter(line[0] for line in to_insert))
         except (sqlite3.OperationalError, sqlite3.IntegrityError):
             for line in group:
@@ -103,6 +129,7 @@ def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
                     console.print(
                         f"[red]Error: [blue]{e} [grey]{key} {line[0]} {line[1]}"
                     )
+                    update_progress({"invalid": 1})
     cursor.connection.commit()
 
 
@@ -173,6 +200,7 @@ def insert_chunk_postgresql_table(
             except psycopg2.errors.Error as error:
                 cursor.connection.rollback()
                 console.print(f"[red]Error in line[/red] [blue]{line}[/blue]")
+                update_progress({"invalid": 1})
     cursor.connection.commit()
     update_progress(progress_update)
 
