@@ -10,7 +10,6 @@ from oltools.parsers import stream_objects
 from oltools.cli_utils import console, decimal
 from pathlib import Path
 from typing import Optional
-import atexit
 import io
 import psycopg2
 import sqlite3
@@ -73,25 +72,6 @@ def insert_from_file(
     connection.close()
 
 
-samples = {}
-COLLECT = 10
-
-
-def save_samples(exiting: bool = False):
-    def doit():
-        if exiting:
-            console.print("[blue]Exiting")
-        with open("/tmp/openlibrary_samples.txt", "w") as samples_file:
-            for sample in samples.values():
-                lines = ["/type/" + "\t".join(el) for el in sample]
-                samples_file.write("".join(lines))
-
-    return doit
-
-
-atexit.register(save_samples(True))
-
-
 def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
     to_insert = list(chunk_lines)
     # Divide the cunk_lines by type
@@ -108,13 +88,6 @@ def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
                 " VALUES (?, ?, ?, ?)",
                 group,
             )
-            current_size = len(samples.get(key, []))
-            if current_size < COLLECT:
-                to_add = COLLECT - current_size
-                to_sample = [el for el in group_with_type[:to_add]]
-                samples.setdefault(key, []).extend(to_sample)
-                save_samples(False)()
-            update_progress(Counter(line[0] for line in to_insert))
         except (sqlite3.OperationalError, sqlite3.IntegrityError):
             for line in group:
                 try:
