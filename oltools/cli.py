@@ -1,11 +1,12 @@
 import rich_click as click
 from oltools.db import insert_from_file
 from oltools.db import create_oldata_tables
+from oltools.cli_utils import console
 from oltools.cli_utils import step_progress
 
 
 @click.command()
-@click.argument("filename")
+@click.argument("filename", type=click.Path(exists=True))
 @click.argument(
     "database-URL",
     default="sqlite:////tmp/oldata.db",
@@ -13,12 +14,16 @@ from oltools.cli_utils import step_progress
 @click.option(
     "--chunk-size",
     default=7000,
+    show_default=True,
 )
 @click.option(
     "--offset",
     default=0,
+    show_default=True,
 )
 def populate_db(filename, database_url, chunk_size, offset):
+    """Parse an OpenLibrary dump and store it into a database."""
+    console.print(f"Using db at [blue]{database_url}[/blue] ")
     create_oldata_tables(database_url)
     totals = {"global": 0}
     tasks = {}
