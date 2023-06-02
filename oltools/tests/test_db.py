@@ -1,7 +1,7 @@
 # ruff: noqa: F401
 from oltools.db import get_connection
 from oltools.db import insert_from_file
-from oltools.db import DataType
+from oltools.db_info import DataType
 from oltools.tests.fixtures import (
     db_service,
     sqlite_tmpfile,

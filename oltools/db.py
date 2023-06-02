@@ -2,7 +2,6 @@
 Functions to manage connection to the postgresql database.
 """
 from collections import Counter
-from enum import Enum
 from itertools import groupby
 import re
 from oltools.parsers import stream_file
@@ -13,6 +12,7 @@ from typing import Optional
 import io
 import psycopg2
 import sqlite3
+import oltools.db_info as db_info
 
 
 def get_connection(url: str):
@@ -80,23 +80,21 @@ def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
     cursor.execute("PRAGMA journal_mode = OFF")
     for key, group_with_type in groupby(to_insert, lambda x: x[0]):
         group_with_type = tuple(group_with_type)
-        group = tuple(remove_first_items(group_with_type))
-        try:
-            cursor.executemany(
+        transform_function = getattr(db_info, f"{key}_to_values", None)
+        group = tuple(remove_first_items(group_with_type, transform_function))
+        insert_statement = getattr(db_info, "insert_" + key, None)
+        if not insert_statement:
+            insert_statement = (
                 f'INSERT INTO "{key}" '
                 "(key, revision, last_modified, data)"
-                " VALUES (?, ?, ?, ?)",
-                group,
+                " VALUES (?, ?, ?, ?)"
             )
+        try:
+            cursor.executemany(insert_statement, group)
         except (sqlite3.OperationalError, sqlite3.IntegrityError):
             for line in group:
                 try:
-                    cursor.execute(
-                        f'INSERT INTO "{key}" '
-                        "(key, revision, last_modified, data)"
-                        " VALUES (?, ?, ?, ?)",
-                        line,
-                    )
+                    cursor.execute(insert_statement, line)
                     update_progress({key: 1})
                 except (sqlite3.OperationalError, sqlite3.IntegrityError) as e:
                     console.print(
@@ -106,16 +104,19 @@ def insert_chunk_sqlite(cursor, chunk_lines, update_progress):
     cursor.connection.commit()
 
 
-def remove_first_items(iterable):
+def remove_first_items(iterable, transform_function):
     for collection in iterable:
-        yield collection[1:]
+        if not transform_function:
+            yield collection[1:]
+        else:
+            yield transform_function(collection[-1])
 
 
 def insert_chunk_postgresql(cursor, chunk_lines, update_progress):
     lines = {}
     original_lines = {}
     for line in chunk_lines:
-        if line[0] not in VALID_TYPES:
+        if line[0] not in db_info.VALID_TYPES:
             continue
         original_lines.setdefault(line[0], []).append(line)
         lines.setdefault(line[0], []).append(get_psql_line(line))
@@ -218,15 +219,18 @@ def iterator_of_iterators(baseiter, chunksize):
 def create_oldata_tables(url):
     connection = get_connection(url)
     cursor = connection.cursor()
-    for type_ in DataType:
-        cursor.execute(
-            f'CREATE TABLE IF NOT EXISTS "{type_.name}" ('
-            "key char(20), "
-            "revision INT, "
-            "last_modified TIMESTAMP, "
-            "data JSONB "
-            ");"
-        )
+    for type_ in db_info.DataType:
+        create_statement = getattr(db_info, "create_" + type_.name, None)
+        if not create_statement:
+            create_statement = (
+                f'CREATE TABLE IF NOT EXISTS "{type_.name}" ('
+                "key char(20), "
+                "revision INT, "
+                "last_modified TIMESTAMP, "
+                "data JSONB "
+                ");"
+            )
+        cursor.execute(create_statement)
     connection.commit()
     connection.close()
 
@@ -268,45 +272,3 @@ class StringIteratorIO(io.TextIOBase):
         result = "".join(line)
         self.results.append(result)
         return result
-
-
-class DataType(Enum):
-    """Different kind of records that can be found in the OL dump."""
-
-    edition = "edition"
-    work = "work"
-    author = "author"
-    delete = "delete"
-    page = "page"
-    redirect = "redirect"
-    i18n = "i18n"
-    property = "property"
-    type = "type"
-    collection = "collection"
-    backreference = "backreference"
-    permission = "permission"
-    usergroup = "usergroup"
-    macro = "macro"
-    about = "about"
-    template = "template"
-    content = "content"
-    doc = "doc"
-    volume = "volume"
-    user = "user"
-    i18n_page = "i18n_page"
-    language = "language"
-    home = "home"
-    rawtext = "rawtext"
-    object = "object"
-    subject = "subject"
-    library = "library"
-    scan_record = "scan_record"
-    uri = "uri"
-    series = "series"
-    scan_location = "scan_location"
-    place = "place"
-    local_id = "local_id"
-    list = "list"
-
-
-VALID_TYPES = set(el.name for el in DataType)

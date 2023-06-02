@@ -1,4 +1,5 @@
 from oltools.cli_utils import console
+from oltools.db_info import VALID_TYPES
 import bz2
 import gzip
 
@@ -25,7 +26,6 @@ def stream_objects(lines):
     TYPE ID <OTHER THINGS THAT WILL BE IGNORED> JSON
     It isolates the JSON and yields the tuple (TYPE, ID, OBJ).
     """
-    from oltools.db import VALID_TYPES
 
     for line in lines:
         try:
